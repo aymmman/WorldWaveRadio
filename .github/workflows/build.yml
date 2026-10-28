@@ -1,4 +1,4 @@
-name: Build WorldWave Radio APK
+name: Build WorldWave Radio (phone + watch)
 
 on:
   push:
@@ -19,7 +19,7 @@ jobs:
           echo "Using $ZIP"
           rm -rf build_src && mkdir build_src
           unzip -q "$ZIP" -d build_src
-          SETTINGS=$(find build_src -name settings.gradle.kts -not -path "*/node_modules/*" | head -n 1)
+          SETTINGS=$(find build_src -name settings.gradle.kts | head -n 1)
           ROOT=$(dirname "$SETTINGS")
           echo "Project root: $ROOT"
           echo "PROJECT_ROOT=$ROOT" >> "$GITHUB_ENV"
@@ -38,18 +38,31 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Build debug APK
+      - name: Build phone APK
         working-directory: ${{ env.PROJECT_ROOT }}
-        run: gradle assembleDebug --stacktrace
+        run: gradle :app:assembleDebug --stacktrace
+
+      - name: Build watch APK
+        id: wear
+        continue-on-error: true
+        working-directory: ${{ env.PROJECT_ROOT }}
+        run: gradle :wear:assembleDebug --stacktrace
 
       - name: Run unit tests
         working-directory: ${{ env.PROJECT_ROOT }}
         continue-on-error: true
-        run: gradle testDebugUnitTest
+        run: gradle :app:testDebugUnitTest
 
-      - name: Upload APK
+      - name: Upload phone APK
         uses: actions/upload-artifact@v4
         with:
-          name: WorldWaveRadio-debug-apk
+          name: WorldWaveRadio-phone-apk
           path: ${{ env.PROJECT_ROOT }}/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
+
+      - name: Upload watch APK
+        if: steps.wear.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: WorldWaveRadio-watch-apk
+          path: ${{ env.PROJECT_ROOT }}/wear/build/outputs/apk/debug/*.apk
